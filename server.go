@@ -22,8 +22,8 @@ type Server struct {
 	WriteTimeout int    `brot:"writeTimeout"`
 	ReadTimeout  int    `brot:"readTimeout"`
 	Router       string `brot:"router"`
-	CertPath     string `brot:cert`
-	KeyPath      string `brot:key`
+	CertPath     string `brot:"cert"`
+	KeyPath      string `brot:"key"`
 }
 
 // InitFunc initialize opens a new connection to the configured Redis database
@@ -58,15 +58,19 @@ func (s *Server) InitFunc() (err error) {
 			log.Fatalf("Certificate path and key path must be set")
 		}
 		go func() {
-			if err := server.ListenAndServeTLS("/Users/mbungens/server.crt", "/Users/mbungens/server.key"); err != nil {
+			if err := server.ListenAndServeTLS(s.CertPath, s.KeyPath); err != nil {
+				log.Fatalf("Could not start https server: %s\n", err.Error())
 				return
 			}
+			log.Printf("Started successfully https server on %s", server.Addr)
 		}()
 	} else {
 		go func() {
 			if err := server.ListenAndServe(); err != nil {
+				log.Fatalf("Could not start http server: %s\n", err.Error())
 				return
 			}
+			log.Printf("Started successfully http server on %s", server.Addr)
 		}()
 	}
 	return
