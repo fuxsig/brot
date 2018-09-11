@@ -43,7 +43,7 @@ func (c *Context) MemberOf(groups ...string) bool {
 type Connection interface {
 	Load(ctx *Context, id string) (int, map[string]string, error)
 	Save(*Context, map[string]string, *Schema) error
-	Delete(ctx *Context, id string) (bool, error)
+	Delete(ctx *Context, index, id string, document bool) (bool, error)
 
 	Search(ctx *Context, schema, query, sort string, offset, num int) ([]map[string]string, int, error)
 

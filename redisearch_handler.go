@@ -205,8 +205,20 @@ func (r *RedisearchHandler) Load(ctx *model.Context, id string) (int, map[string
 	return http.StatusOK, result, nil
 }
 
-func (r *RedisearchHandler) Delete(ctx *model.Context, id string) (bool, error) {
-	return r.client.Delete(id, true)
+func (r *RedisearchHandler) Delete(ctx *model.Context, index, id string, document bool) (bool, error) {
+	if ctx == nil {
+		ctx = model.Anonymous
+	}
+	conn, err := redis.Dial("tcp", r.Address)
+	if err != nil {
+		return false, err
+	}
+	defer conn.Close()
+	args := redis.Args{strings.ToLower(index), id}
+	if document {
+		args = append(args, "DD")
+	}
+	return redis.Bool(conn.Do("FT.SEARCH", args...))
 }
 
 func (r *RedisearchHandler) Search(ctx *model.Context, index, query, sort string, offset, num int) ([]map[string]string, int, error) {
