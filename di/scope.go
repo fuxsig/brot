@@ -17,7 +17,12 @@ import (
 )
 
 type ProvidesInit interface {
-	InitFunc()
+	InitFunc() error
+	Retry() bool
+}
+
+type Constructor interface {
+	Allocated()
 }
 
 type Scope struct {
@@ -73,7 +78,6 @@ func (scope *Scope) assignValue(dest reflect.Value, src interface{}) error {
 			me.Append(err)
 		}
 	case reflect.Slice:
-		fmt.Println("Slice")
 		// returns string for []string
 		et := dest.Type().Elem()
 		// value of val
@@ -99,7 +103,6 @@ func (scope *Scope) assignValue(dest reflect.Value, src interface{}) error {
 		}
 
 	case reflect.Map:
-		fmt.Println("Map")
 		dt := dest.Type()
 		vt := dt.Elem()
 		kt := dt.Key()
@@ -130,9 +133,7 @@ func (scope *Scope) assignValue(dest reflect.Value, src interface{}) error {
 		}
 		dest.Set(dict)
 	case reflect.Struct:
-		fmt.Println("Struct")
 		t := dest.Type()
-		fmt.Printf("type %s", t.String())
 		if m, ok := src.(map[string]interface{}); ok {
 			for i := 0; i < dest.NumField(); i++ {
 				// struct field
@@ -141,27 +142,48 @@ func (scope *Scope) assignValue(dest reflect.Value, src interface{}) error {
 				sft := t.Field(i)
 				name := sft.Name
 				if !sf.CanSet() {
-					log.Printf("Field %s cannot be set", name)
 					continue
 				}
 				// processing the tag
+				mandatory := false
 				if val, ok := sft.Tag.Lookup("brot"); ok {
 					tags := strings.Split(val, ",")
 					if len(tags) > 0 {
 						name = strings.Trim(tags[0], " ")
+					}
+					for i := 1; i < len(tags); i++ {
+						if tags[i] == "mandatory" {
+							mandatory = true
+						}
 					}
 				}
 
 				if val, ok := m[name]; ok {
 					me.Merge(scope.assignValue(sf, val))
 				} else {
-					log.Printf("Value for %s not defined in configuration", name)
+					if mandatory {
+						log.Printf("Mandatory value for %s not defined in configuration", name)
+					}
 				}
 			}
 
 			ptr := dest.Addr().Interface()
+			if aux, ok := ptr.(Constructor); ok {
+				aux.Allocated()
+			}
 			if aux, ok := ptr.(ProvidesInit); ok {
-				aux.InitFunc()
+				r := true
+				for r {
+					if err := aux.InitFunc(); err != nil {
+						log.Printf("Error in init: %s\n", err.Error())
+						r = aux.Retry()
+						if r {
+							log.Printf("Retrying init\n")
+						}
+					} else {
+						break
+					}
+				}
 			}
 		} else {
 
@@ -169,7 +191,7 @@ func (scope *Scope) assignValue(dest reflect.Value, src interface{}) error {
 
 		}
 	case reflect.Ptr:
-		fmt.Println("Pointer")
+
 		// get the type of the referenced object, e.g. *string -> string
 		et := dest.Type().Elem()
 		// get the address of the pointer, e.g. *string -> **string

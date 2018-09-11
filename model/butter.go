@@ -19,7 +19,7 @@ type Butter struct {
 	schemas           map[string]*Schema
 }
 
-func (b *Butter) InitFunc() {
+func (b *Butter) InitFunc() error {
 	b.schemas = make(map[string]*Schema, len(b.ConfiguredSchemas))
 	for _, schema := range b.ConfiguredSchemas {
 		b.schemas[schema.Name] = schema
@@ -29,6 +29,11 @@ func (b *Butter) InitFunc() {
 		b.Conn.BuildIndex(schema)
 	}
 	//b.conn = b.Db.Open()
+	return nil
+}
+
+func (b *Butter) Retry() bool {
+	return false
 }
 
 func (b *Butter) Schema(name string) *Schema {

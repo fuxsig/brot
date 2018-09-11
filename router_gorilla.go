@@ -30,7 +30,7 @@ type GorillaRouter struct {
 }
 
 // InitFunc initialize opens a new connection to the configured Redis database
-func (gr *GorillaRouter) InitFunc() {
+func (gr *GorillaRouter) InitFunc() (err error) {
 
 	var router *mux.Router
 	if gr.Subrouter != "" {
@@ -112,7 +112,11 @@ func (gr *GorillaRouter) InitFunc() {
 			log.Printf("Warning: skipping wrapper for %s. Object %s does not exist", gr.Name, use)
 		}
 	}
+	return
+}
 
+func (gr *GorillaRouter) Retry() bool {
+	return false
 }
 
 var _ di.ProvidesInit = (*GorillaRouter)(nil)

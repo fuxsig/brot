@@ -9,6 +9,7 @@ import (
 	"encoding/gob"
 	"log"
 	"reflect"
+	"time"
 
 	"github.com/fuxsig/brot/di"
 
@@ -24,14 +25,19 @@ type RedisHandler struct {
 }
 
 // InitFunc initialize opens a new connection to the configured Redis database
-func (r *RedisHandler) InitFunc() {
-	var err error
+func (r *RedisHandler) InitFunc() (err error) {
 	r.pool, err = pool.New(r.Network, r.Address, r.Size)
 	if err != nil {
 		// handle err
 		log.Printf("Error in RedisHandler: %s", err.Error())
 		panic("No Database!!!")
 	}
+	return
+}
+
+func (r *RedisHandler) Retry() bool {
+	time.Sleep(2 * time.Second)
+	return true
 }
 
 func (r *RedisHandler) Get(name string, object interface{}) error {

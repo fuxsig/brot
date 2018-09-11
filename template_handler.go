@@ -18,13 +18,18 @@ type TemplateHandler struct {
 	Data      *DataLayer        `brot:"data"`
 }
 
-func (th *TemplateHandler) InitFunc() {
+func (th *TemplateHandler) InitFunc() (err error) {
 	if th.Templates == nil {
 		panic("th.Templates == nil")
 	}
 	if th.Data == nil {
 		panic("th.Data == nil")
 	}
+	return
+}
+
+func (th *TemplateHandler) Retry() bool {
+	return false
 }
 
 func (th *TemplateHandler) HandlerFunc() http.Handler {

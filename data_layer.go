@@ -31,11 +31,16 @@ type DataLayer struct {
 	capacity  int
 }
 
-func (dl *DataLayer) InitFunc() {
+func (dl *DataLayer) InitFunc() (err error) {
 	dl.capacity = 0
 	for _, p := range dl.Providers {
 		dl.capacity += p.CapacityReco()
 	}
+	return
+}
+
+func (dl *DataLayer) Retry() bool {
+	return false
 }
 
 func (dl *DataLayer) Values(request *http.Request) (result MultiValueMap) {

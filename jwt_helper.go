@@ -50,14 +50,14 @@ func (jt *JWTToken) Valid() bool {
 	return time.Now().Add(time.Minute * 10).Before(jt.Expires)
 }
 
-func (j *JWT) InitFunc() {
+func (j *JWT) InitFunc() (err error) {
 	pemKey, err := ioutil.ReadFile(j.Path)
 	if err != nil {
-		log.Fatal(err.Error())
+		return
 	}
 	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(pemKey)
 	if err != nil {
-		log.Fatal(err.Error())
+		return
 	}
 	j.pk = privateKey
 
@@ -66,6 +66,11 @@ func (j *JWT) InitFunc() {
 		log.Fatalf("Signing method %s is unknown", j.Method)
 	}
 	j.sm = method
+	return
+}
+
+func (j *JWT) Retry() bool {
+	return false
 }
 
 func (j *JWT) Token() string {

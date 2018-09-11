@@ -22,14 +22,20 @@ import (
 // RedisearchHandler is used for the network configuration. Address accepts a single host:port or a comma
 // separated host:port,host:port,... value
 type RedisearchHandler struct {
-	Address string `brot:"address"`
-	client  *redisearch.Client
+	Address  string `brot:"address,mandatory"`
+	RetryMax int    `brot:"retry"`
+	retry    int
+	client   *redisearch.Client
+}
+
+func (r *RedisearchHandler) Allocated() {
+	r.retry = r.RetryMax
 }
 
 // InitFunc initialize opens a new connection to the configured Redis database
-func (r *RedisearchHandler) InitFunc() {
+func (r *RedisearchHandler) InitFunc() (err error) {
 	r.client = redisearch.NewClient(r.Address, "vanilla")
-	if _, err := r.client.Info(); err != nil {
+	if _, err = r.client.Info(); err != nil {
 		schema := redisearch.NewSchema(redisearch.DefaultOptions).
 			AddField(redisearch.NewSortableTextField("_schema", 1.0)).
 			AddField(redisearch.NewSortableTextField("_owner", 1.0)).
@@ -39,10 +45,18 @@ func (r *RedisearchHandler) InitFunc() {
 			AddField(redisearch.NewTagField("_read")).
 			AddField(redisearch.NewTagField("_write")).
 			AddField(redisearch.NewTagField("_delete"))
-		if err := r.client.CreateIndex(schema); err != nil {
-			log.Panicf("Could not create index for %s", r.Address)
-		}
+		err = r.client.CreateIndex(schema)
 	}
+	return
+}
+
+func (r *RedisearchHandler) Retry() bool {
+	if r.retry > 0 {
+		r.retry--
+		time.Sleep(5 * time.Second)
+		return true
+	}
+	return false
 }
 
 func (r *RedisearchHandler) BuildIndex(schema *model.Schema) {

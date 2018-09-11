@@ -27,7 +27,7 @@ type Server struct {
 }
 
 // InitFunc initialize opens a new connection to the configured Redis database
-func (s *Server) InitFunc() {
+func (s *Server) InitFunc() (err error) {
 	server := new(http.Server)
 	if s.Addr != "" {
 		server.Addr = s.Addr
@@ -59,16 +59,21 @@ func (s *Server) InitFunc() {
 		}
 		go func() {
 			if err := server.ListenAndServeTLS("/Users/mbungens/server.crt", "/Users/mbungens/server.key"); err != nil {
-				log.Fatalln(err.Error())
+				return
 			}
 		}()
 	} else {
 		go func() {
 			if err := server.ListenAndServe(); err != nil {
-				log.Fatalln(err.Error())
+				return
 			}
 		}()
 	}
+	return
+}
+
+func (s *Server) Retry() bool {
+	return false
 }
 
 var _ di.ProvidesInit = (*Server)(nil)
