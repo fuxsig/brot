@@ -2,6 +2,7 @@ package brot
 
 import (
 	cr "crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -63,7 +64,10 @@ func (h *OktaWrapper) exchangeCode(code string, r *http.Request) (exchange *Exch
 	header.Add("Connection", "close")
 	header.Add("Content-Length", "0")
 
-	client := &http.Client{}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 	if resp, err = client.Do(req); err != nil {
 		return
 	}
