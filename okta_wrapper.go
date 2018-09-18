@@ -129,12 +129,12 @@ func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
-	nonce, ok := session.Values["nonce"].(string)
+	/*nonce, ok := session.Values["nonce"].(string)
 	if !ok {
 		log.Printf("OktaWrapper: Missing nonce value in session\n")
 		w.WriteHeader(http.StatusForbidden)
 		return
-	}
+	}*/
 	url, ok := session.Values["url"].(string)
 	if !ok {
 		url = "/"
