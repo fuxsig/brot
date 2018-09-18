@@ -113,6 +113,10 @@ func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		log.Printf("OktaWrapper: Missing nonce value in session\n")
 	}
+	url, ok := session.Values["url"].(string)
+	if !ok {
+		url = "/"
+	}
 
 	if _, err = h.verifyToken(nonce, exchange.IdToken); err != nil {
 		log.Printf("OktaWrapper: Verify token error: %s\n", err.Error())
@@ -122,7 +126,7 @@ func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		session.Save(r, w)
 	}
-	http.Redirect(w, r, "/static/principal.html", http.StatusMovedPermanently)
+	http.Redirect(w, r, url, http.StatusMovedPermanently)
 }
 
 func isAuthenticated(r *http.Request) bool {
@@ -156,6 +160,7 @@ func (h *OktaWrapper) ServeChain(w http.ResponseWriter, r *http.Request, next ht
 
 	nonce := generateNonce()
 	session.Values["nonce"] = nonce
+	session.Values["url"] = r.URL.String()
 	err = session.Save(r, w)
 	if err != nil {
 		log.Printf("OktaWrapper: Session error: %s", err.Error())
@@ -167,7 +172,7 @@ func (h *OktaWrapper) ServeChain(w http.ResponseWriter, r *http.Request, next ht
 	q.Add("response_type", "code")
 	q.Add("response_mode", "query")
 	q.Add("scope", "openid profile email")
-	q.Add("redirect_uri", "http://localhost:8080/authorization-code/callback")
+	q.Add("redirect_uri", h.RedirectURI)
 	q.Add("state", "ApplicationState")
 	q.Add("nonce", nonce)
 	redirect := h.Issuer + "/v1/authorize?" + q.Encode()
