@@ -1,7 +1,6 @@
 package brot
 
 import (
-	"bytes"
 	cr "crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -9,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/fuxsig/brot/di"
 	"github.com/fuxsig/brot/wrapper"
@@ -35,7 +35,7 @@ type Exchange struct {
 	IdToken          string `json:"id_token,omitempty"`
 }
 
-func (h *OktaWrapper) exchangeCode(code string, r *http.Request) Exchange {
+func (h *OktaWrapper) exchangeCode(code string, r *http.Request) (exchange *Exchange, err error) {
 	authHeader := base64.StdEncoding.EncodeToString(
 		[]byte(h.ClientID + ":" + h.ClientSecret))
 
@@ -46,7 +46,16 @@ func (h *OktaWrapper) exchangeCode(code string, r *http.Request) Exchange {
 
 	url := h.Issuer + "/v1/token?" + q.Encode()
 
-	req, _ := http.NewRequest("POST", url, bytes.NewReader([]byte("")))
+	var (
+		req  *http.Request
+		resp *http.Response
+		body []byte
+	)
+
+	if req, err = http.NewRequest("POST", url, nil); err != nil {
+		return
+	}
+
 	header := req.Header
 	header.Add("Authorization", "Basic "+authHeader)
 	header.Add("Accept", "application/json")
@@ -55,13 +64,18 @@ func (h *OktaWrapper) exchangeCode(code string, r *http.Request) Exchange {
 	header.Add("Content-Length", "0")
 
 	client := &http.Client{}
-	resp, _ := client.Do(req)
-	body, _ := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-	var exchange Exchange
-	json.Unmarshal(body, &exchange)
+	if resp, err = client.Do(req); err != nil {
+		return
+	}
 
-	return exchange
+	if body, err = ioutil.ReadAll(resp.Body); err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	exchange = new(Exchange)
+	err = json.Unmarshal(body, exchange)
+
+	return
 
 }
 
@@ -102,16 +116,24 @@ func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exchange := h.exchangeCode(code, r)
+	exchange, err := h.exchangeCode(code, r)
+	if err != nil {
+		log.Printf("OktaWrapper: Exchange error: %s\n", err.Error())
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
 	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
 	if err != nil {
 		log.Printf("OktaWrapper: Session error: %s\n", err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 	nonce, ok := session.Values["nonce"].(string)
 	if !ok {
 		log.Printf("OktaWrapper: Missing nonce value in session\n")
+		w.WriteHeader(http.StatusForbidden)
+		return
 	}
 	url, ok := session.Values["url"].(string)
 	if !ok {
@@ -120,13 +142,47 @@ func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if _, err = h.verifyToken(nonce, exchange.IdToken); err != nil {
 		log.Printf("OktaWrapper: Verify token error: %s\n", err.Error())
+		w.WriteHeader(http.StatusForbidden)
+		return
 	} else {
 		session.Values["id_token"] = exchange.IdToken
 		session.Values["access_token"] = exchange.AccessToken
 
 		session.Save(r, w)
 	}
-	http.Redirect(w, r, url, http.StatusMovedPermanently)
+
+	// retrieve user information
+	var (
+		req  *http.Request
+		resp *http.Response
+	)
+
+	reqURL := h.Issuer + "/v1/userinfo"
+	req, err = http.NewRequest("GET", reqURL, nil)
+	head := req.Header
+	head.Add("Authorization", "Bearer "+exchange.AccessToken)
+	head.Add("Accept", "application/json")
+
+	client := &http.Client{}
+	resp, err = client.Do(req)
+	if err == nil {
+		defer resp.Body.Close()
+		var body []byte
+
+		if body, err = ioutil.ReadAll(resp.Body); err == nil {
+
+			m := make(map[string]interface{})
+			if err = json.Unmarshal(body, &m); err == nil {
+				session.Values["email"] = m["email"]
+				session.Values["given_name"] = m["given_name"]
+				if err = session.Save(r, w); err != nil {
+					log.Printf("[okta_wrapper] could not save seesion: %s", err.Error())
+				}
+			}
+		}
+	}
+
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 func isAuthenticated(r *http.Request) bool {
@@ -135,7 +191,6 @@ func isAuthenticated(r *http.Request) bool {
 	if err != nil || session.Values["id_token"] == nil || session.Values["id_token"] == "" {
 		return false
 	}
-
 	return true
 }
 
@@ -176,13 +231,49 @@ func (h *OktaWrapper) ServeChain(w http.ResponseWriter, r *http.Request, next ht
 	q.Add("state", "ApplicationState")
 	q.Add("nonce", nonce)
 	redirect := h.Issuer + "/v1/authorize?" + q.Encode()
-	http.Redirect(w, r, redirect, http.StatusMovedPermanently)
+	http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
 }
 
 func (h *OktaWrapper) HandlerFunc() http.Handler {
 	return h
 }
 
+type OktaLogout struct {
+	URL    string `brot:"url,mandatory"`
+	Issuer string `brot:"issuer,mandatory"`
+}
+
+func (o *OktaLogout) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	values := url.Values{"post_logout_redirect_uri": {o.URL}}
+	reqURL := o.Issuer + "/v1/logout"
+	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+	if err != nil {
+		reqURL := reqURL + "?" + values.Encode()
+		http.Redirect(w, r, reqURL, http.StatusTemporaryRedirect)
+		return
+	}
+
+	if idToken, ok := session.Values["id_token"].(string); ok {
+		values.Add("id_token_hint", idToken)
+		reqURL = reqURL + "?" + values.Encode()
+	}
+
+	delete(session.Values, "id_token")
+	delete(session.Values, "access_token")
+	delete(session.Values, "nonce")
+	if err = session.Save(r, w); err != nil {
+		log.Printf("[OktaLogout] could not save session: %s", err.Error())
+	}
+	http.Redirect(w, r, reqURL, http.StatusTemporaryRedirect)
+}
+
+func (o *OktaLogout) HandlerFunc() http.Handler {
+	return o
+}
+
 var _ wrapper.Handler = (*OktaWrapper)(nil)
 var _ ProvidesHandler = (*OktaWrapper)(nil)
 var _ = di.GlobalScope.Declare((*OktaWrapper)(nil))
+
+var _ ProvidesHandler = (*OktaLogout)(nil)
+var _ = di.GlobalScope.Declare((*OktaLogout)(nil))
