@@ -15,12 +15,13 @@ type StaticFileHandler struct {
 	Path string `brot:"path"`
 }
 
-func (sh StaticFileHandler) HandlerFunc() http.Handler {
+func (sh *StaticFileHandler) HandlerFunc() http.Handler {
 	return http.StripPrefix(sh.Path, http.FileServer(http.Dir(sh.Dir)))
 }
 
-func (sh StaticFileHandler) PrefixFunc() string {
+func (sh *StaticFileHandler) PrefixFunc() string {
 	return sh.Path
 }
 
+var _ ProvidesHandler = (*StaticFileHandler)(nil)
 var _ = di.GlobalScope.Declare((*StaticFileHandler)(nil))

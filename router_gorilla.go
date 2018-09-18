@@ -17,8 +17,9 @@ type GorillaRouter struct {
 	Subrouter string   `brot:"subrouter"`
 	Use       []string `brot:"use"`
 	Routes    []struct {
-		Name    string            `brot:"name"`
-		Path    string            `brot:"path"`
+		Name string `brot:"name"`
+		Path string `brot:"path"`
+		// todo: make Handler a real handler
 		Handler string            `brot:"handler"`
 		Host    string            `brot:"host"`
 		Prefix  string            `brot:"prefix"`

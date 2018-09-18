@@ -32,34 +32,38 @@ func (th *TemplateHandler) Retry() bool {
 	return false
 }
 
+func (th *TemplateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	if Debug {
+		Debug.Printf("TemplateHandler begins")
+		defer Debug.Printf("TemplateHandler ends")
+	}
+	values := th.Data.Values(r)
+	id, ok := values.Get("id")
+	if !ok {
+		http.Error(w, "Missing id value", http.StatusBadRequest)
+		return
+	}
+	var template string
+	template, ok = values.Get("template")
+	if !ok {
+		http.Error(w, "Missing template value", http.StatusBadRequest)
+		return
+	}
+	_, obj, err := th.Model.Load(nil, id)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Load error: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	err = th.Templates.TemplateFunc().ExecuteTemplate(w, template, obj)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Template error: %s", err.Error()), http.StatusInternalServerError)
+	}
+
+}
+
 func (th *TemplateHandler) HandlerFunc() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if Debug {
-			Debug.Printf("TemplateHandler begins")
-			defer Debug.Printf("TemplateHandler ends")
-		}
-		values := th.Data.Values(r)
-		id, ok := values.Get("id")
-		if !ok {
-			http.Error(w, "Missing id value", http.StatusBadRequest)
-			return
-		}
-		var template string
-		template, ok = values.Get("template")
-		if !ok {
-			http.Error(w, "Missing template value", http.StatusBadRequest)
-			return
-		}
-		_, obj, err := th.Model.Load(nil, id)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Load error: %s", err.Error()), http.StatusBadRequest)
-			return
-		}
-		err = th.Templates.TemplateFunc().ExecuteTemplate(w, template, obj)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Template error: %s", err.Error()), http.StatusInternalServerError)
-		}
-	})
+	return th
 }
 
 var _ di.ProvidesInit = (*TemplateHandler)(nil)

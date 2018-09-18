@@ -58,19 +58,20 @@ func (s *Server) InitFunc() (err error) {
 			log.Fatalf("Certificate path and key path must be set")
 		}
 		go func() {
+			log.Printf("Started successfully https server on %s", server.Addr)
 			if err := server.ListenAndServeTLS(s.CertPath, s.KeyPath); err != nil {
-				log.Fatalf("Could not start https server: %s\n", err.Error())
+				log.Fatalf("Stopped https server: %s\n", err.Error())
 				return
 			}
-			log.Printf("Started successfully https server on %s", server.Addr)
 		}()
 	} else {
 		go func() {
+			log.Printf("Starting http server on %s", server.Addr)
 			if err := server.ListenAndServe(); err != nil {
-				log.Fatalf("Could not start http server: %s\n", err.Error())
+				log.Fatalf("Stopped http server: %s\n", err.Error())
 				return
 			}
-			log.Printf("Started successfully http server on %s", server.Addr)
+
 		}()
 	}
 	return
