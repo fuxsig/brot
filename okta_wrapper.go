@@ -170,7 +170,12 @@ func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	head.Add("Authorization", "Bearer "+exchange.AccessToken)
 	head.Add("Accept", "application/json")
 
-	client := &http.Client{}
+	// todo: this needs to be removed
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+
 	resp, err = client.Do(req)
 	if err == nil {
 		defer resp.Body.Close()

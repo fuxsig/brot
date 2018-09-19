@@ -5,6 +5,8 @@
 package brot
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"html/template"
 	"io"
 	"log"
@@ -36,8 +38,12 @@ func (dh *DynamicFileHandler) HandlerFunc() http.Handler {
 		p := filepath.Join(dh.Dir, r.URL.Path)
 		base := path.Base(p)
 
-		t := template.New(base)
-
+		t := template.New(base).Funcs(template.FuncMap{
+			"sha256": func(value string) string {
+				h := sha256.New()
+				h.Write([]byte(value))
+				return fmt.Sprintf("%x", h.Sum(nil))
+			}})
 		if t, err = t.ParseFiles(p); err != nil {
 			io.WriteString(w, err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
