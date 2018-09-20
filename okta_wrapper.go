@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -54,6 +53,7 @@ func (h *OktaWrapper) exchangeCode(code string, r *http.Request) (exchange *Exch
 	)
 
 	if req, err = http.NewRequest("POST", url, nil); err != nil {
+		log.Printf("[OktaWrapper.exchangeCode] request error: %s", err.Error())
 		return
 	}
 
@@ -71,21 +71,24 @@ func (h *OktaWrapper) exchangeCode(code string, r *http.Request) (exchange *Exch
 	client := &http.Client{Transport: tr}
 
 	if resp, err = client.Do(req); err != nil {
-		return
-	}
-
-	if body, err = ioutil.ReadAll(resp.Body); err != nil {
+		log.Printf("[OktaWrapper.exchangeCode] http error: %s", err.Error())
 		return
 	}
 	defer resp.Body.Close()
+	if body, err = ioutil.ReadAll(resp.Body); err != nil {
+		log.Printf("[OktaWrapper.exchangeCode] read body error: %s", err.Error())
+		return
+	}
 	exchange = new(Exchange)
 	err = json.Unmarshal(body, exchange)
-
+	if err != nil {
+		log.Printf("[OktaWrapper.exchangeCode] json unmarshall error: %s", err.Error())
+		return nil, nil
+	}
 	return
-
 }
 
-func (h *OktaWrapper) verifyToken(nonce, t string) (*verifier.Jwt, error) {
+func (h *OktaWrapper) verifyToken(nonce, t string) *verifier.Jwt {
 	tv := map[string]string{}
 	tv["nonce"] = nonce
 	tv["aud"] = h.ClientID
@@ -95,49 +98,44 @@ func (h *OktaWrapper) verifyToken(nonce, t string) (*verifier.Jwt, error) {
 	}
 
 	result, err := jv.New().VerifyIdToken(t)
-
 	if err != nil {
-		return nil, fmt.Errorf("%s", err)
+		log.Printf("[OktaWrapper.verifyToken] verify error: %s", err.Error())
+		return nil
 	}
-
-	if result != nil {
-		return result, nil
-	}
-
-	return nil, fmt.Errorf("token could not be verified")
+	return result
 }
 
 func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	state := q.Get("state")
 	if state != "ApplicationState" {
-		log.Printf("OktaWrapper: Wrong state %s in request %s\n", state, r.URL.String())
+		log.Printf("[OktaWrapper.ServeHTTP]: Wrong state %s in request %s\n", state, r.URL.String())
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	code := q.Get("code")
 	if code == "" {
-		log.Printf("OktaWrapper: Missing code in request %s\n", r.URL.String())
+		log.Printf("[OktaWrapper.ServeHTTP]: Missing code in request %s\n", r.URL.String())
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	exchange, err := h.exchangeCode(code, r)
 	if err != nil {
-		log.Printf("OktaWrapper: Exchange error: %s\n", err.Error())
+		log.Printf("[OktaWrapper.ServeHTTP]: Exchange error: %s\n", err.Error())
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
 	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
 	if err != nil {
-		log.Printf("OktaWrapper: Session error: %s\n", err.Error())
+		log.Printf("[OktaWrapper.ServeHTTP]: Session error: %s\n", err.Error())
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 	/*nonce, ok := session.Values["nonce"].(string)
 	if !ok {
-		log.Printf("OktaWrapper: Missing nonce value in session\n")
+		log.Printf("[OktaWrapper.ServeHTTP]: Missing nonce value in session\n")
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}*/
@@ -148,7 +146,7 @@ func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// the external lib does not work well at the moment :(
 	/*if _, err = h.verifyToken(nonce, exchange.IdToken); err != nil {
-		log.Printf("OktaWrapper: Verify token error: %s\n", err.Error())
+		log.Printf("[OktaWrapper.ServeHTTP]: Verify token error: %s\n", err.Error())
 		w.WriteHeader(http.StatusForbidden)
 		return
 	} else {*/
@@ -176,25 +174,30 @@ func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	client := &http.Client{Transport: tr}
 
-	resp, err = client.Do(req)
-	if err == nil {
-		defer resp.Body.Close()
-		var body []byte
-
-		if body, err = ioutil.ReadAll(resp.Body); err == nil {
-
-			m := make(map[string]interface{})
-			if err = json.Unmarshal(body, &m); err == nil {
-				session.Values["email"] = m["email"]
-				session.Values["given_name"] = m["given_name"]
-				if err = session.Save(r, w); err != nil {
-					log.Printf("[okta_wrapper] could not save seesion: %s", err.Error())
-				}
-			}
-		}
+	// this is the trick
+	defer http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	if resp, err = client.Do(req); err != nil {
+		log.Printf("[OktaWrapper.ServeHTTP] user info request error: %s", err.Error())
+		return
 	}
-
-	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	defer resp.Body.Close()
+	var body []byte
+	if body, err = ioutil.ReadAll(resp.Body); err != nil {
+		log.Printf("[OktaWrapper.ServeHTTP] body read error: %s", err.Error())
+		return
+	}
+	m := make(map[string]interface{})
+	if err = json.Unmarshal(body, &m); err != nil {
+		log.Printf("[OktaWrapper.ServeHTTP] json unmarshall error: %s", err.Error())
+		return
+	}
+	session.Values["email"] = m["email"]
+	session.Values["given_name"] = m["given_name"]
+	if err = session.Save(r, w); err != nil {
+		log.Printf("[OktaWrapper.ServeHTTP] could not save seesion: %s", err.Error())
+		return
+	}
+	log.Printf("[OktaWrapper.ServeHTTP] retrieved user profile for %s", m["email"])
 }
 
 func isAuthenticated(r *http.Request) bool {
@@ -220,7 +223,7 @@ func (h *OktaWrapper) ServeChain(w http.ResponseWriter, r *http.Request, next ht
 	}
 	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
 	if err != nil {
-		log.Printf("OktaWrapper: Session error: %s", err.Error())
+		log.Printf("[OktaWrapper.ServeChain]: Session error: %s", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -230,7 +233,7 @@ func (h *OktaWrapper) ServeChain(w http.ResponseWriter, r *http.Request, next ht
 	session.Values["url"] = r.URL.String()
 	err = session.Save(r, w)
 	if err != nil {
-		log.Printf("OktaWrapper: Session error: %s", err.Error())
+		log.Printf("[OktaWrapper.ServeChain]: Session error: %s", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -264,19 +267,21 @@ func (o *OktaLogout) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, reqURL, http.StatusTemporaryRedirect)
 		return
 	}
-
-	if idToken, ok := session.Values["id_token"].(string); ok {
+	idToken, ok := session.Values["id_token"].(string)
+	if ok {
 		values.Add("id_token_hint", idToken)
 		reqURL = reqURL + "?" + values.Encode()
 	}
+	defer http.Redirect(w, r, reqURL, http.StatusTemporaryRedirect)
 
 	delete(session.Values, "id_token")
 	delete(session.Values, "access_token")
 	delete(session.Values, "nonce")
 	if err = session.Save(r, w); err != nil {
-		log.Printf("[OktaLogout] could not save session: %s", err.Error())
+		log.Printf("[OktaLogout.ServeHTTP] could not save session: %s", err.Error())
+		return
 	}
-	http.Redirect(w, r, reqURL, http.StatusTemporaryRedirect)
+	log.Printf("[OktaLogout.ServeHTTP] successfully deleted session for id_token %s", idToken)
 }
 
 func (o *OktaLogout) HandlerFunc() http.Handler {
