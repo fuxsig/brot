@@ -28,7 +28,7 @@ func (dh *DynamicFileHandler) HandlerFunc() http.Handler {
 		h.Set("Pragma", "no-cache")
 		h.Set("Expires", "0")
 
-		session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+		session, err := sessionStore.Get(r, "brot-store")
 		if err != nil {
 			log.Printf("DynamicFileHandler: Session error: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)

@@ -16,7 +16,7 @@ import (
 	verifier "github.com/okta/okta-jwt-verifier-golang"
 )
 
-var sessionStore = sessions.NewCookieStore([]byte("okta-hosted-login-session-store"))
+var sessionStore = sessions.NewCookieStore([]byte("brot-store"))
 
 type OktaWrapper struct {
 	ClientID     string `brot:"client_id,mandatory"`
@@ -33,6 +33,15 @@ type Exchange struct {
 	ExpiresIn        int    `json:"expires_in,omitempty"`
 	Scope            string `json:"scope,omitempty"`
 	IdToken          string `json:"id_token,omitempty"`
+}
+
+func (h *OktaWrapper) InitFunc() (err error) {
+	sessionStore.MaxAge(0)
+	return
+}
+
+func (h *OktaWrapper) Retry() bool {
+	return false
 }
 
 func (h *OktaWrapper) exchangeCode(code string, r *http.Request) (exchange *Exchange, err error) {
@@ -127,7 +136,7 @@ func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+	session, err := sessionStore.Get(r, "brot-store")
 	if err != nil {
 		log.Printf("[OktaWrapper.ServeHTTP]: Session error: %s\n", err.Error())
 		w.WriteHeader(http.StatusForbidden)
@@ -201,7 +210,7 @@ func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func isAuthenticated(r *http.Request) bool {
-	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+	session, err := sessionStore.Get(r, "brot-store")
 
 	if err != nil || session.Values["id_token"] == nil || session.Values["id_token"] == "" {
 		return false
@@ -221,7 +230,7 @@ func (h *OktaWrapper) ServeChain(w http.ResponseWriter, r *http.Request, next ht
 		next.ServeHTTP(w, r)
 		return
 	}
-	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+	session, err := sessionStore.Get(r, "brot-store")
 	if err != nil {
 		log.Printf("[OktaWrapper.ServeChain]: Session error: %s", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -261,7 +270,7 @@ type OktaLogout struct {
 func (o *OktaLogout) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	values := url.Values{"post_logout_redirect_uri": {o.URL}}
 	reqURL := o.Issuer + "/v1/logout"
-	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+	session, err := sessionStore.Get(r, "brot-store")
 	if err != nil {
 		reqURL := reqURL + "?" + values.Encode()
 		http.Redirect(w, r, reqURL, http.StatusTemporaryRedirect)
@@ -290,6 +299,7 @@ func (o *OktaLogout) HandlerFunc() http.Handler {
 
 var _ wrapper.Handler = (*OktaWrapper)(nil)
 var _ ProvidesHandler = (*OktaWrapper)(nil)
+var _ di.ProvidesInit = (*OktaWrapper)(nil)
 var _ = di.GlobalScope.Declare((*OktaWrapper)(nil))
 
 var _ ProvidesHandler = (*OktaLogout)(nil)
