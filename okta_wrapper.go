@@ -36,7 +36,7 @@ type Exchange struct {
 }
 
 func (h *OktaWrapper) InitFunc() (err error) {
-	sessionStore.MaxAge(0)
+	sessionStore.MaxAge(900)
 	return
 }
 
@@ -161,7 +161,9 @@ func (h *OktaWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {*/
 	session.Values["id_token"] = exchange.IdToken
 	session.Values["access_token"] = exchange.AccessToken
-
+	if exchange.ExpiresIn > 0 {
+		session.Options.MaxAge = exchange.ExpiresIn - 0
+	}
 	session.Save(r, w)
 	//}
 
