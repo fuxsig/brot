@@ -44,8 +44,19 @@ func NewScope() (result *Scope) {
 
 var brotTag, err = regexp.Compile(`brot:()`)
 
+var (
+	UnaddressableError = errors.New("value is unaddressable")
+	UnexportedError    = errors.New("value is unexported struct field")
+)
+
 func (scope *Scope) assignValue(dest reflect.Value, src interface{}) error {
 	var me aux.MultiError
+	if !dest.CanSet() {
+		if !dest.CanAddr() {
+			return UnaddressableError
+		}
+		return UnexportedError
+	}
 	switch dest.Kind() {
 	case reflect.Bool:
 		if b, err := GetBool(src); err == nil {

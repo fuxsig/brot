@@ -10,20 +10,45 @@ import (
 	"strconv"
 )
 
-var errUnexpectedType = errors.New("Non-numeric type could not be converted to float")
+// ErrUnexpectedType is returned if a different type was expected.
+var ErrUnexpectedType = errors.New("Non-numeric type could not be converted to float")
 
+// GetBool accepts a value and tries to return a boolean represenation.
+// If a conversion is not possible, then this function returns an error.
 func GetBool(value interface{}) (result bool, err error) {
 	switch b := value.(type) {
 	case bool:
 		result = b
 	case string:
 		result, err = strconv.ParseBool(b)
+	case int64:
+		result = b != 0
+	case int32:
+		result = b != 0
+	case int16:
+		result = b != 0
+	case int8:
+		result = b != 0
+	case int:
+		result = b != 0
+	case uint64:
+		result = b != 0
+	case uint32:
+		result = b != 0
+	case uint16:
+		result = b != 0
+	case uint8:
+		result = b != 0
+	case uint:
+		result = b != 0
 	default:
-		err = errUnexpectedType
+		err = ErrUnexpectedType
 	}
 	return
 }
 
+// GetString accepts a value and tries to return a string representation.
+// If a conversion is not possible, then this function returns an error.
 func GetString(value interface{}) (result string, err error) {
 	switch i := value.(type) {
 	case string:
@@ -55,11 +80,13 @@ func GetString(value interface{}) (result string, err error) {
 	case bool:
 		result = strconv.FormatBool(i)
 	default:
-		err = errUnexpectedType
+		err = ErrUnexpectedType
 	}
 	return
 }
 
+// GetFloat64 accepts a value and tries to return a float64 representation.
+// If a conversion is not possible, then this function returns an error.
 func GetFloat64(value interface{}) (result float64, err error) {
 	switch i := value.(type) {
 	case float64:
@@ -81,112 +108,7 @@ func GetFloat64(value interface{}) (result float64, err error) {
 	case string:
 		result, err = strconv.ParseFloat(i, 64)
 	default:
-		result, err = math.NaN(), errUnexpectedType
-	}
-	return
-}
-
-func GetInt64(value interface{}) (result int64, err error) {
-	switch i := value.(type) {
-	case int64:
-		result = i
-	case float64:
-		result = int64(i)
-	case float32:
-		result = int64(i)
-	case int32:
-		result = int64(i)
-	case int:
-		result = int64(i)
-	case int16:
-		result = int64(i)
-	case int8:
-		result = int64(i)
-	case uint64:
-		result = int64(i)
-	case uint32:
-		result = int64(i)
-	case uint:
-		result = int64(i)
-	case uint16:
-		result = int64(i)
-	case uint8:
-		result = int64(i)
-	case string:
-		result, err = strconv.ParseInt(i, 10, 64)
-	default:
-		err = errUnexpectedType
-	}
-	return
-}
-
-func GetInt(value interface{}) (result int, err error) {
-	switch i := value.(type) {
-	case int:
-		result = i
-	case float64:
-		result = int(i)
-	case float32:
-		result = int(i)
-	case int64:
-		result = int(i)
-	case int32:
-		result = int(i)
-	case int16:
-		result = int(i)
-	case int8:
-		result = int(i)
-	case uint64:
-		result = int(i)
-	case uint32:
-		result = int(i)
-	case uint:
-		result = int(i)
-	case uint16:
-		result = int(i)
-	case uint8:
-		result = int(i)
-	case string:
-		var i64 int64
-		if i64, err = strconv.ParseInt(i, 10, 32); err == nil {
-			result = int(i64)
-		}
-	default:
-		err = errUnexpectedType
-	}
-	return
-}
-
-func GetUint64(value interface{}) (result uint64, err error) {
-	switch i := value.(type) {
-	case uint64:
-		result = i
-	case float64:
-		result = uint64(i)
-	case float32:
-		result = uint64(i)
-	case int64:
-		result = uint64(i)
-	case int32:
-		result = uint64(i)
-	case int:
-		result = uint64(i)
-	case int16:
-		result = uint64(i)
-	case int8:
-		result = uint64(i)
-	case uint32:
-		result = uint64(i)
-	case uint:
-		result = uint64(i)
-	case uint16:
-		result = uint64(i)
-	case uint8:
-		result = uint64(i)
-	case string:
-		result, err = strconv.ParseUint(i, 10, 64)
-	default:
-		err = errUnexpectedType
+		result, err = math.NaN(), ErrUnexpectedType
 	}
 	return
 }
