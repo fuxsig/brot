@@ -89,30 +89,41 @@ func (scope *Scope) assignValue(dest reflect.Value, src interface{}) error {
 			me.Append(err)
 		}
 	case reflect.Slice:
+		if src == nil {
+			dest.Set(reflect.MakeSlice(dest.Type(), 0, 0))
+			break
+		}
 		// returns string for []string
 		et := dest.Type().Elem()
 		// value of val
 		vv := reflect.ValueOf(src)
 		st := vv.Type()
-		cap := 1
+		cap := 0
 
 		switch st.Kind() {
 		case reflect.Slice:
 			cap = vv.Len()
-			slice := reflect.MakeSlice(reflect.SliceOf(et), 0, cap)
-			for i := 0; i < cap; i++ {
-				act := reflect.New(et).Elem()
-				if err := scope.assignValue(act, vv.Index(i).Interface()); err == nil {
-					slice = reflect.Append(slice, act)
-				} else {
-					me.Merge(err)
-				}
+		case reflect.String:
+			str := src.(string)
+			if str != "" {
+				strs := strings.Split(str, ",")
+				vv = reflect.ValueOf(strs)
+				cap = vv.Len()
 			}
-			dest.Set(slice)
 		default:
 			panic("Not yet implemented")
 		}
 
+		slice := reflect.MakeSlice(dest.Type(), 0, cap)
+		for i := 0; i < cap; i++ {
+			act := reflect.New(et).Elem()
+			if err := scope.assignValue(act, vv.Index(i).Interface()); err == nil {
+				slice = reflect.Append(slice, act)
+			} else {
+				me.Merge(err)
+			}
+		}
+		dest.Set(slice)
 	case reflect.Map:
 		dt := dest.Type()
 		vt := dt.Elem()

@@ -12,6 +12,11 @@ import (
 // If a conversion is not possible, then this function returns an error.
 func GetUint64(value interface{}) (result uint64, err error) {
 	switch i := value.(type) {
+	case nil:
+	case bool:
+		if i {
+			result = 1
+		}
 	case uint64:
 		result = i
 	case float64:
@@ -37,7 +42,9 @@ func GetUint64(value interface{}) (result uint64, err error) {
 	case uint8:
 		result = uint64(i)
 	case string:
-		result, err = strconv.ParseUint(i, 10, 64)
+		if i != "" {
+			result, err = strconv.ParseUint(i, 10, 64)
+		}
 	default:
 		err = ErrUnexpectedType
 	}
@@ -48,6 +55,11 @@ func GetUint64(value interface{}) (result uint64, err error) {
 // If a conversion is not possible, then this function returns an error.
 func GetUint(value interface{}) (result uint, err error) {
 	switch i := value.(type) {
+	case nil:
+	case bool:
+		if i {
+			result = 1
+		}
 	case uint:
 		result = i
 	case float64:
@@ -73,9 +85,11 @@ func GetUint(value interface{}) (result uint, err error) {
 	case uint8:
 		result = uint(i)
 	case string:
-		var aux uint64
-		if aux, err = strconv.ParseUint(i, 10, 64); err != nil {
-			result = uint(aux)
+		if i != "" {
+			var aux uint64
+			if aux, err = strconv.ParseUint(i, 10, 64); err != nil {
+				result = uint(aux)
+			}
 		}
 	default:
 		err = ErrUnexpectedType
@@ -87,6 +101,11 @@ func GetUint(value interface{}) (result uint, err error) {
 // If a conversion is not possible, then this function returns an error.
 func GetUint32(value interface{}) (result uint32, err error) {
 	switch i := value.(type) {
+	case nil:
+	case bool:
+		if i {
+			result = 1
+		}
 	case uint32:
 		result = i
 	case float64:
@@ -112,9 +131,11 @@ func GetUint32(value interface{}) (result uint32, err error) {
 	case uint8:
 		result = uint32(i)
 	case string:
-		var aux uint64
-		if aux, err = strconv.ParseUint(i, 10, 64); err != nil {
-			result = uint32(aux)
+		if i != "" {
+			var aux uint64
+			if aux, err = strconv.ParseUint(i, 10, 64); err != nil {
+				result = uint32(aux)
+			}
 		}
 	default:
 		err = ErrUnexpectedType
@@ -126,6 +147,11 @@ func GetUint32(value interface{}) (result uint32, err error) {
 // If a conversion is not possible, then this function returns an error.
 func GetUint16(value interface{}) (result uint16, err error) {
 	switch i := value.(type) {
+	case nil:
+	case bool:
+		if i {
+			result = 1
+		}
 	case uint16:
 		result = i
 	case float64:
@@ -151,9 +177,11 @@ func GetUint16(value interface{}) (result uint16, err error) {
 	case uint8:
 		result = uint16(i)
 	case string:
-		var aux uint64
-		if aux, err = strconv.ParseUint(i, 10, 64); err != nil {
-			result = uint16(aux)
+		if i != "" {
+			var aux uint64
+			if aux, err = strconv.ParseUint(i, 10, 64); err != nil {
+				result = uint16(aux)
+			}
 		}
 	default:
 		err = ErrUnexpectedType
@@ -165,6 +193,11 @@ func GetUint16(value interface{}) (result uint16, err error) {
 // If a conversion is not possible, then this function returns an error.
 func GetUint8(value interface{}) (result uint8, err error) {
 	switch i := value.(type) {
+	case nil:
+	case bool:
+		if i {
+			result = 1
+		}
 	case uint8:
 		result = i
 	case float64:
@@ -190,9 +223,11 @@ func GetUint8(value interface{}) (result uint8, err error) {
 	case uint16:
 		result = uint8(i)
 	case string:
-		var aux uint64
-		if aux, err = strconv.ParseUint(i, 10, 64); err != nil {
-			result = uint8(aux)
+		if i != "" {
+			var aux uint64
+			if aux, err = strconv.ParseUint(i, 10, 64); err != nil {
+				result = uint8(aux)
+			}
 		}
 	default:
 		err = ErrUnexpectedType
