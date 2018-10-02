@@ -31,7 +31,7 @@ func (e *MultiError) Error() string {
 
 func (e *MultiError) Append(err error) *MultiError {
 	if err != nil {
-		e.Errors = append(e.Errors, e)
+		e.Errors = append(e.Errors, err)
 	}
 	return e
 }
